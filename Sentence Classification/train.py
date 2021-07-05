@@ -5,7 +5,7 @@ import pandas as pd
 import seaborn as sn
 import tensorflow as tf
 import tensorflow_hub as hub
-from matplotlib.pyplot as plt
+import  matplotlib.pyplot as plt
 from spacy.lang.en import English
 from tensorflow.keras import layers
 from tensorflow.keras.callbacks import ModelCheckpoint
@@ -182,10 +182,17 @@ history_model = model.fit(train_pos_char_token_dataset,
 ## Save models
 #model.save_weights('G:/Python/SCMPA/models/model.hdf5')
 
-
+# Create test dataset batch and prefetched
+test_pos_char_token_data = tf.data.Dataset.from_tensor_slices((test_line_numbers_one_hot,
+                                                               test_total_lines_one_hot,
+                                                               test_sentences,
+                                                               test_chars))
+test_pos_char_token_labels = tf.data.Dataset.from_tensor_slices(test_labels_one_hot)
+test_pos_char_token_dataset = tf.data.Dataset.zip((test_pos_char_token_data, test_pos_char_token_labels))
+test_pos_char_token_dataset = test_pos_char_token_dataset.batch(32).prefetch(tf.data.AUTOTUNE)
 
 # Confusion matrix
-# Extract labels ("target" columns) and encode them into integers 
+# Extract labels ("target" columns) and encode them into integers
 from sklearn.preprocessing import LabelEncoder
 label_encoder = LabelEncoder()
 train_labels_encoded = label_encoder.fit_transform(train_df["target"].to_numpy())
@@ -193,7 +200,7 @@ val_labels_encoded = label_encoder.transform(val_df["target"].to_numpy())
 test_labels_encoded = label_encoder.transform(test_df["target"].to_numpy())
 
 # Make predictions on the test dataset
-test_pred_probs = loaded_model.predict(test_pos_char_token_dataset,
+test_pred_probs = model.predict(test_pos_char_token_dataset,
                                        verbose=1)
 test_preds = tf.argmax(test_pred_probs, axis=1)
 
@@ -203,6 +210,7 @@ cfn_matrix = confusion_matrix(test_labels_encoded, test_preds)
 print(classification_report (test_labels_encoded, test_preds))
 print(cfn_matrix)
 
+label = ['BACKGROUND', 'CONCLUSIONS', 'METHODS', 'OBJECTIVE', 'RESULTS' ]
 df_cfn  = pd.DataFrame(cfn_matrix, range(5), range(5))
 plt.figure(figsize = (10,10))
 sn.set(font_scale = 1.4 )
@@ -214,6 +222,9 @@ plt.show()
 
 ## Predict
 def get_pred(filename):
+    result_file_path = 'G:/Python/SCMPA/data/result_pred/result_' + filename
+    filename = 'G:/Python/SCMPA/data/pred_data/' + filename
+
     with open(filename, 'r') as f:
         example_abstracts = f.read()
 
@@ -271,15 +282,17 @@ def get_pred(filename):
     test_abstract_pred_classes = [label_encoder.classes_[i] for i in test_abstract_preds]
 
     # Visualize abstract lines and predicted sequence labels
+
+    f = open(result_file_path, 'w')
     for i, line in enumerate(abstract_lines):
         print(f"{test_abstract_pred_classes[i]}: {line}")
+        f.writelines(f"{test_abstract_pred_classes[i]}: {line}\n")
 
 
-
-txt_pred1 = 'G:/Python/SCMPA/data/pred_data/pred1.txt'
+txt_pred1 = 'pred1.txt'
 #txt_pred1 = 'SCMPA/data/pred_data/pred1.txt'
 get_pred(txt_pred1)
 
-txt_pred2 = 'G:/Python/SCMPA/data/pred_data/pred2.txt'
+txt_pred2 = 'pred2.txt'
 #txt_pred2 = 'data/pred_data/pred2.txt'
 get_pred(txt_pred2)
